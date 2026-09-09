@@ -10,10 +10,56 @@ from PIL import Image
 # ============================================================
 # MODEL CONFIG
 # ============================================================
-MODEL_PATH = "model/plant_disease_resnet50v2.keras"
-CLASS_NAMES_PATH = "model/class_names.json"
+MODEL_PATH = "models/plant_disease_resnet50v2.keras"
+CLASS_NAMES_PATH = "models/class_names.json"
 IMG_SIZE = (224, 224)  # confirm this matches the training notebook
 CONFIDENCE_THRESHOLD = 0.55
+
+# FALLBACK used only if class_names.json is missing. This is the standard
+# PlantVillage 38-class order (alphabetical by folder name, which is what
+# Keras/TensorFlow data loaders use by default). If your model's predictions
+# consistently look like the WRONG disease, this order doesn't match your
+# training run - see the note in load_class_names() below.
+FALLBACK_CLASS_NAMES = [
+    "Apple___Apple_scab",
+    "Apple___Black_rot",
+    "Apple___Cedar_apple_rust",
+    "Apple___healthy",
+    "Blueberry___healthy",
+    "Cherry_(including_sour)___Powdery_mildew",
+    "Cherry_(including_sour)___healthy",
+    "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
+    "Corn_(maize)___Common_rust_",
+    "Corn_(maize)___Northern_Leaf_Blight",
+    "Corn_(maize)___healthy",
+    "Grape___Black_rot",
+    "Grape___Esca_(Black_Measles)",
+    "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)",
+    "Grape___healthy",
+    "Orange___Haunglongbing_(Citrus_greening)",
+    "Peach___Bacterial_spot",
+    "Peach___healthy",
+    "Pepper,_bell___Bacterial_spot",
+    "Pepper,_bell___healthy",
+    "Potato___Early_blight",
+    "Potato___Late_blight",
+    "Potato___healthy",
+    "Raspberry___healthy",
+    "Soybean___healthy",
+    "Squash___Powdery_mildew",
+    "Strawberry___Leaf_scorch",
+    "Strawberry___healthy",
+    "Tomato___Bacterial_spot",
+    "Tomato___Early_blight",
+    "Tomato___Late_blight",
+    "Tomato___Leaf_Mold",
+    "Tomato___Septoria_leaf_spot",
+    "Tomato___Spider_mites Two-spotted_spider_mite",
+    "Tomato___Target_Spot",
+    "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+    "Tomato___Tomato_mosaic_virus",
+    "Tomato___healthy",
+]
 
 
 # ============================================================
@@ -33,10 +79,12 @@ def load_class_names():
             return data
         elif isinstance(data, dict):
             return [name for name, _ in sorted(data.items(), key=lambda kv: kv[1])]
-    raise FileNotFoundError(
-        f"{CLASS_NAMES_PATH} not found. Add it to the model/ folder "
-        "(exported by the training notebook)."
-    )
+    # No class_names.json found - use the hardcoded fallback list above.
+    # NOTE: if predictions consistently show the wrong disease, this
+    # fallback order doesn't match how your model was actually trained.
+    # The only fix then is getting the real class_names.json from whoever
+    # trained the model.
+    return FALLBACK_CLASS_NAMES
 
 
 @st.cache_resource
@@ -379,7 +427,7 @@ with tab1:
         with col1:
 
             st.subheader("🌿 Your Plant")
-            st.image(  image, use_container_width=True )
+            st.image(  image, use_column_width=True )
         # ANALYZE BUTTON
 
         with col2:
@@ -419,7 +467,7 @@ with tab2:
         with col1:
 
             st.subheader("📸 Captured Image")
-            st.image( image, use_container_width=True )
+            st.image( image, use_column_width=True )
         # ANALYSIS
         with col2:
 
