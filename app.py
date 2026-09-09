@@ -422,7 +422,7 @@ with tab1:
         with col1:
 
             st.subheader("🌿 Your Plant")
-            st.image(  image, use_container_width=True )
+            st.image(  image, width='stretch' )
         # ANALYZE BUTTON
 
         with col2:
@@ -432,7 +432,7 @@ with tab1:
                 "Click the button below to analyze the plant." )
 
             if st.button(
-                "🔍 Detect Disease",  use_container_width=True ):
+                "🔍 Detect Disease",  width='stretch'):
 
                 with st.spinner("Analyzing your plant..."):
                     result = analyze_image(
@@ -462,7 +462,7 @@ with tab2:
         with col1:
 
             st.subheader("📸 Captured Image")
-            st.image( image, use_container_width=True )
+            st.image( image, width='stretch')
         # ANALYSIS
         with col2:
 
