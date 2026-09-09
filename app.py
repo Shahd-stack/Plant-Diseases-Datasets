@@ -10,7 +10,7 @@ from PIL import Image
 # ============================================================
 # MODEL CONFIG
 # ============================================================
-MODEL_PATH = "models/plant_disease_resnet50v2.keras"
+MODEL_PATH = "models/plant_disease_efficientnetb0.keras"
 CLASS_NAMES_PATH = "models/class_names.json"
 IMG_SIZE = (224, 224)  # confirm this matches the training notebook
 CONFIDENCE_THRESHOLD = 0.55
