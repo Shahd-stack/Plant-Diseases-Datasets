@@ -379,7 +379,7 @@ with tab1:
         with col1:
 
             st.subheader("🌿 Your Plant")
-            st.image(  image, use_column_width=True )
+            st.image(  image, use_container_width=True )
         # ANALYZE BUTTON
 
         with col2:
