@@ -1,8 +1,4 @@
-fastapi
-uvicorn[standard]
-tensorflow
-pillow
-numpy
-python-multipart
-streamlit
-requests
+streamlit==1.38.0
+tensorflow-cpu==2.17.0
+pillow==10.4.0
+numpy==1.26.4

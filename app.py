@@ -1,35 +1,106 @@
+import io
+import json
+import os
+
+import numpy as np
 import streamlit as st
+import tensorflow as tf
 from PIL import Image
-import requests
-import model_utils
 
 # ============================================================
-# BACKEND CONNECTION
+# MODEL CONFIG
 # ============================================================
-# While testing locally: run the backend first (uvicorn main:app --port 8000),
-# then this points at it here.
-# Once the backend is deployed (e.g. Hugging Face Spaces), swap this for that
-# URL, e.g. "https://your-username-your-space.hf.space"
-BACKEND_URL = "http://localhost:8000"
+MODEL_PATH = "model/plant_disease_resnet50v2.keras"
+CLASS_NAMES_PATH = "model/class_names.json"
+IMG_SIZE = (224, 224)  # confirm this matches the training notebook
+CONFIDENCE_THRESHOLD = 0.55
+
+
+# ============================================================
+# MODEL LOADING (cached so it only happens once, not per click)
+# ============================================================
+@st.cache_resource
+def load_model():
+    return tf.keras.models.load_model(MODEL_PATH)
+
+
+@st.cache_resource
+def load_class_names():
+    if os.path.exists(CLASS_NAMES_PATH):
+        with open(CLASS_NAMES_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return data
+        elif isinstance(data, dict):
+            return [name for name, _ in sorted(data.items(), key=lambda kv: kv[1])]
+    raise FileNotFoundError(
+        f"{CLASS_NAMES_PATH} not found. Add it to the model/ folder "
+        "(exported by the training notebook)."
+    )
+
+
+@st.cache_resource
+def load_disease_info():
+    with open("disease_info.json", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def preprocess_image(image: Image.Image) -> np.ndarray:
+    # No manual scaling here on purpose: resnet_v2.preprocess_input is
+    # built into the model graph itself, so we send raw 0-255 pixel values.
+    image = image.convert("RGB").resize(IMG_SIZE)
+    array = np.array(image, dtype=np.float32)
+    array = np.expand_dims(array, axis=0)
+    return array
 
 
 def analyze_image(file_bytes: bytes, filename: str, content_type: str) -> dict:
-    """Sends the image to the FastAPI backend's /predict endpoint and
-    returns the parsed JSON result (or an 'error' status dict if the
-    backend couldn't be reached)."""
+    """
+    Runs the model directly (no network call) and returns a dict in the
+    SAME shape the old FastAPI backend used to return, so display_result()
+    below needs no changes at all.
+    """
     try:
-        files = {"file": (filename, file_bytes, content_type)}
-        response = requests.post(f"{BACKEND_URL}/predict", files=files, timeout=30)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.ConnectionError:
+        model = load_model()
+        class_names = load_class_names()
+        disease_info = load_disease_info()
+
+        image = Image.open(io.BytesIO(file_bytes))
+        array = preprocess_image(image)
+        predictions = model.predict(array, verbose=0)[0]
+
+        top_index = int(np.argmax(predictions))
+        confidence = float(predictions[top_index])
+
+        if confidence < CONFIDENCE_THRESHOLD:
+            return {
+                "status": "uncertain",
+                "message": "Could not confidently identify a disease. Try a clearer, "
+                           "closer photo of the affected leaf.",
+                "confidence": confidence,
+            }
+
+        class_name = class_names[top_index]
+        info = disease_info.get(class_name)
+
+        if info is None:
+            return {
+                "status": "success",
+                "raw_class": class_name,
+                "confidence": confidence,
+                "message": "Prediction succeeded but no treatment info is on file "
+                           "for this class. Add an entry for it in disease_info.json.",
+            }
+
         return {
-            "status": "error",
-            "message": f"Could not reach the backend at {BACKEND_URL}. "
-                       f"Make sure it's running (uvicorn main:app --port 8000).",
+            "status": "success",
+            "disease": info["common_name"],
+            "confidence": confidence,
+            "description": info["description"],
+            "treatment": info["treatment"],
+            "prevention": info["prevention"],
         }
-    except requests.exceptions.HTTPError as e:
-        return {"status": "error", "message": f"Backend returned an error: {e}"}
+
     except Exception as e:
         return {"status": "error", "message": f"Unexpected error: {e}"}
 
@@ -178,7 +249,7 @@ def display_result(result: dict):
     status = result.get("status")
 
     # --------------------------------------------------------
-    # Backend couldn't be reached, or something else went wrong
+    # Something went wrong during inference
     # --------------------------------------------------------
     if status == "error":
         st.error(result.get("message", "Something went wrong analyzing the image."))
@@ -202,14 +273,14 @@ def display_result(result: dict):
         return
 
     if status != "success":
-        st.error(result.get("message", "Unexpected response from the backend."))
+        st.error(result.get("message", "Unexpected result from the model."))
         return
 
     disease_name = result.get("disease")
     confidence = result.get("confidence", 0) * 100
 
     # --------------------------------------------------------
-    # Backend predicted a class but disease_info.json has no entry for it
+    # Model predicted a class but disease_info.json has no entry for it
     # --------------------------------------------------------
     if disease_name is None:
         st.markdown(
