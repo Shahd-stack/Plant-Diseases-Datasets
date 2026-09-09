@@ -1,10 +1,10 @@
-# fly.toml app configuration file generated for plant-diseases-datasets on 2026-09-09T08:39:26Z
+# fly.toml app configuration file generated for plant-diseases-datasets--rsgsg on 2026-09-09T09:42:09Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'plant-diseases-datasets'
-primary_region = 'cdg'
+app = 'plant-diseases-datasets--rsgsg'
+primary_region = 'fra'
 
 [build]
 
