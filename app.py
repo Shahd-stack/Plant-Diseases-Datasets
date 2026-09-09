@@ -15,6 +15,11 @@ CLASS_NAMES_PATH = "models/class_names.json"
 IMG_SIZE = (224, 224)  # confirm this matches the training notebook
 CONFIDENCE_THRESHOLD = 0.55
 
+# FALLBACK used only if class_names.json is missing. This is the standard
+# PlantVillage 38-class order (alphabetical by folder name, which is what
+# Keras/TensorFlow data loaders use by default). If your model's predictions
+# consistently look like the WRONG disease, this order doesn't match your
+# training run - see the note in load_class_names() below.
 FALLBACK_CLASS_NAMES = [
     "Apple___Apple_scab",
     "Apple___Black_rot",
@@ -110,10 +115,21 @@ def analyze_image(file_bytes: bytes, filename: str, content_type: str) -> dict:
 
         image = Image.open(io.BytesIO(file_bytes))
         array = preprocess_image(image)
-        predictions = model.predict(array, verbose=0)[0]
+        predictions = np.asarray(model.predict(array, verbose=0))
+        predictions = predictions.reshape(-1)
 
-        top_index = int(np.argmax(predictions))
-        confidence = float(predictions[top_index])
+        if predictions.size != len(class_names):
+            return {
+                "status": "error",
+                "message": "Model output size does not match the number of class "
+                           "names. Update class_names.json (or the fallback list) "
+                           "to match the model's actual output classes.",
+            }
+
+        probabilities = tf.nn.softmax(predictions).numpy()
+
+        top_index = int(np.argmax(probabilities))
+        confidence = float(probabilities[top_index])
 
         if confidence < CONFIDENCE_THRESHOLD:
             return {
@@ -432,7 +448,7 @@ with tab1:
                 "Click the button below to analyze the plant." )
 
             if st.button(
-                "🔍 Detect Disease",  width='stretch'):
+                "🔍 Detect Disease",  width='stretch' ):
 
                 with st.spinner("Analyzing your plant..."):
                     result = analyze_image(
@@ -462,7 +478,7 @@ with tab2:
         with col1:
 
             st.subheader("📸 Captured Image")
-            st.image( image, width='stretch')
+            st.image( image, width='stretch' )
         # ANALYSIS
         with col2:
 
@@ -470,7 +486,7 @@ with tab2:
             if st.button(
                 "🔍 Detect Disease",
                 key="camera_detect",
-                use_container_width=True
+                width='stretch'
             ):
 
                 with st.spinner("Analyzing your plant..."):
